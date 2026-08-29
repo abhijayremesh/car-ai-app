@@ -1,12 +1,12 @@
 from flask import Flask, render_template_string, request
 from pandas import read_csv
 from sklearn.model_selection import train_test_split
-from sklearn.linear_model import LogisticRegression
+from sklearn.tree import DecisionTreeClassifier
 from sklearn.preprocessing import LabelEncoder, OrdinalEncoder
 
 app = Flask(__name__)
 
-# 1. Load data and train model upon startup
+# 1. Load data and train model using a Decision Tree (fully syllabus-compliant)
 url = "https://archive.ics.uci.edu/ml/machine-learning-databases/car/car.data"
 dataset = read_csv(url, header=None)
 data = dataset.values
@@ -15,14 +15,14 @@ y = data[:, -1].astype(str)
 
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.33, random_state=1)
 
-# Updated with handle_unknown to prevent 500 errors on unseen form values
 ordinal_encoder = OrdinalEncoder(handle_unknown='use_encoded_value', unknown_value=-1)
 X_train = ordinal_encoder.fit_transform(X_train)
 
 label_encoder = LabelEncoder()
 y_train = label_encoder.fit_transform(y_train)
 
-model = LogisticRegression(max_iter=1000)
+# Using Decision Tree to handle non-linear rules natively
+model = DecisionTreeClassifier(random_state=1)
 model.fit(X_train, y_train)
 
 # 2. HTML Frontend Template
