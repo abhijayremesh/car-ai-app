@@ -15,7 +15,8 @@ y = data[:, -1].astype(str)
 
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.33, random_state=1)
 
-ordinal_encoder = OrdinalEncoder()
+# Updated with handle_unknown to prevent 500 errors on unseen form values
+ordinal_encoder = OrdinalEncoder(handle_unknown='use_encoded_value', unknown_value=-1)
 X_train = ordinal_encoder.fit_transform(X_train)
 
 label_encoder = LabelEncoder()
@@ -24,7 +25,7 @@ y_train = label_encoder.fit_transform(y_train)
 model = LogisticRegression(max_iter=1000)
 model.fit(X_train, y_train)
 
-# 2. HTML Frontend Template (embedded for clean single-file deployment)
+# 2. HTML Frontend Template
 HTML_TEMPLATE = """
 <!DOCTYPE html>
 <html>
@@ -77,7 +78,6 @@ HTML_TEMPLATE = """
 def home():
     prediction = None
     if request.method == "POST":
-        # Capture form values
         user_car = [[
             request.form.get("buying"),
             request.form.get("maint"),
@@ -87,7 +87,6 @@ def home():
             request.form.get("safety")
         ]]
         
-        # Transform and predict
         encoded_input = ordinal_encoder.transform(user_car)
         numeric_pred = model.predict(encoded_input)
         prediction = label_encoder.inverse_transform(numeric_pred)[0].upper()
