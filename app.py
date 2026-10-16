@@ -95,10 +95,54 @@ def maintenance(f):
     eng_f = 1 + 0.05 * (f["Engine_Size"] - 2.0)     # bigger engines cost more to service
     year = base * min(age_f, 2.2) * km_f * max(eng_f, 0.9)
     return {
+        "year_raw": year,
         "tier": tier,
         "year": aed100(year), "year_low": aed100(year * (1 - MAINT_RANGE)), "year_high": aed100(year * (1 + MAINT_RANGE)),
         "month": aed100(year / 12),
     }
+
+
+# ---------- Maintenance history (user input; the adjustment is an assumption, NOT learned from data) ----------
+CAP_DOWN, CAP_UP = -0.10, 0.02
+
+
+def maintenance_effect(f, visits, spend, expected):
+    """Returns (price change as a fraction, list of (tone, title, text))."""
+    pct, notes = 0.0, []
+    ratio = None if spend is None else spend / expected
+    if ratio is not None:
+        s, e = aed100(spend), aed100(expected)
+        if ratio < 0.4 and f["Age"] >= 4:
+            pct -= 0.03
+            notes.append(("bad", f"Low maintenance spend for a {f['Age']}-year-old car",
+                          f"You spent {s} against roughly {e} expected. That can mean servicing was skipped, which tends to lower a car's value."))
+        elif ratio < 0.4:
+            notes.append(("neutral", "Low maintenance spend", f"You spent {s} against roughly {e} expected, which is normal for a young car."))
+        elif ratio <= 1.5:
+            notes.append(("good", "Maintenance spend in line with expectations", f"You spent {s} against roughly {e} expected."))
+        elif ratio <= 2.5:
+            pct -= 0.04
+            notes.append(("bad", "Above-typical maintenance spend", f"You spent {s} against roughly {e} expected, which suggests repairs have been piling up."))
+        else:
+            pct -= 0.08
+            notes.append(("bad", "Very high maintenance spend", f"You spent {s} against roughly {e} expected, which often points to recurring faults."))
+    if visits is not None:
+        if visits == 0:
+            if f["Age"] >= 1 or f["Mileage"] >= 10000:
+                pct -= 0.03
+                notes.append(("bad", "No workshop visits in the past year", "Regular servicing is usually needed at least once a year, and skipping it hurts reliability and resale value."))
+            else:
+                notes.append(("neutral", "No workshop visits", "Fine for a nearly new car."))
+        elif visits <= 4:
+            if ratio is None or ratio <= 1.5:
+                pct += 0.02
+            notes.append(("good", f"Regular servicing ({visits} visit{'s' if visits != 1 else ''})", "A steady service routine is a good sign for how well the car runs."))
+        elif visits <= 6:
+            notes.append(("neutral", f"{visits} workshop visits", "A little more than the usual 1 to 4 a year."))
+        else:
+            pct -= 0.04
+            notes.append(("bad", f"Frequent workshop visits ({visits})", "Many visits in a year often mean the car keeps developing problems."))
+    return max(CAP_DOWN, min(CAP_UP, pct)), notes
 
 
 # ---------- Helpers ----------
@@ -185,14 +229,31 @@ def index():
                 raise ValueError
             if gear not in GEARS or options not in OPTIONS or fuel not in FUELS:
                 raise ValueError
+            def opt(name, lo, hi):
+                v = form.get(name, "").strip()
+                if v == "":
+                    return None
+                x = int(float(v))
+                if not lo <= x <= hi:
+                    raise ValueError
+                return x
+            visits, spend = opt("visits", 0, 52), opt("spend", 0, 500000)
             age = min(max(CURRENT_YEAR - year, 0), 26)
             f = {"Make": make, "Type": typ, "Gear_Type": gear, "Options": options, "Fuel_Type": fuel,
                  "Age": age, "Mileage": mileage, "Engine_Size": engine}
-            mid = predict(f)
+            mid_model = predict(f)
             steps, other, comparable = explain(f)
+            maint = maintenance(f)
+            history, mid = None, mid_model
+            if visits is not None or spend is not None:
+                pct, notes = maintenance_effect(f, visits, spend, maint["year_raw"])
+                mid = mid_model * (1 + pct)
+                steps.append({"label": "Maintenance history (assumed adjustment)",
+                              "delta": signed(mid - mid_model) if pct else "No change", "amount": None, "good": pct >= 0})
+                history = {"notes": notes, "pct": f"{pct * 100:+.0f}%" if pct else "no change", "spent": None if spend is None else aed100(spend)}
             out = {
                 "mid": aed(mid), "low": aed(mid * LOW_MULT), "high": aed(mid * HIGH_MULT),
-                "steps": steps, "other": other, "maint": maintenance(f), "comparable": comparable,
+                "steps": steps, "other": other, "maint": maint, "history": history, "comparable": comparable,
                 "title": f"{year} {make} {typ}",
             }
         except Exception:
