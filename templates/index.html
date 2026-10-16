@@ -53,6 +53,11 @@
             {% for good, title, text in out.other %}<div class="reason {{ 'good' if good else 'bad' }}"><b>{{ title }}</b><span>{{ text }}</span></div>{% endfor %}
           </div><p class="note">Each factor is compared on its own against a baseline, so these don't add up to the total.</p></div>
         </div>
+        <div class="cols" style="margin-top:28px"><div><h2>Estimated maintenance cost</h2><div class="stack">
+          <div class="upgrade"><span>Per year ({{ out.maint.tier }} brand)</span><b>{{ out.maint.year }}</b></div>
+          <div class="upgrade"><span>Likely range</span><b>{{ out.maint.year_low }} to {{ out.maint.year_high }}</b></div>
+          <div class="upgrade"><span>Per month</span><b>{{ out.maint.month }}</b></div>
+        </div><p class="note">A rough rule of thumb based on the brand type, age, mileage and engine size. It is not from the listings data, and it covers servicing and repairs only, not fuel, insurance or registration.</p></div></div>
         <p class="note" style="margin-top:26px">Based on {{ "{:,}".format(n_cars) }} real used-car listings (Saudi Arabia, {{ data_year }}) converted to {{ currency }}. On cars the model had never seen, the typical error was about {{ median_error }}% and {{ within_25 }}% of estimates landed within 25% of the asking price. These are asking prices, not sale prices, and UAE prices and newer models can differ, so treat this as a guide.</p>
       </section>{% endif %}
     </section>
