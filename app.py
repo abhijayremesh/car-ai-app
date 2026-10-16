@@ -1,216 +1,176 @@
+from datetime import date
+
+import numpy as np
+import pandas as pd
 from flask import Flask, render_template, request
-from pandas import read_csv
-from sklearn.model_selection import train_test_split
-from sklearn.tree import DecisionTreeClassifier
-from sklearn.preprocessing import OrdinalEncoder, LabelEncoder
-from sklearn.metrics import accuracy_score
+from sklearn.ensemble import HistGradientBoostingRegressor
+from sklearn.model_selection import KFold, cross_val_predict
+from sklearn.preprocessing import OrdinalEncoder
 
 app = Flask(__name__)
 
-# ---------- Valuation settings (tweak these) ----------
+# ---------- Settings ----------
 CURRENCY = "AED"
-BASE_PRICE = {"low": 40000, "med": 80000, "high": 150000, "vhigh": 250000}  # typical original price per tier
-CLASS_FACTOR = {"unacc": 0.55, "acc": 0.75, "good": 0.90, "vgood": 1.00}
-MAINT_FACTOR = {"low": 1.05, "med": 1.00, "high": 0.93, "vhigh": 0.85}
-SAFETY_FACTOR = {"low": 0.85, "med": 1.00, "high": 1.08}
-PERSONS_FACTOR = {"2": 0.90, "4": 1.00, "more": 1.03}
-BOOT_FACTOR = {"small": 0.97, "med": 1.00, "big": 1.03}
-AGE_FACTOR = {"under1": 0.95, "1to3": 0.82, "3to5": 0.65, "5to8": 0.48, "8to12": 0.33, "12plus": 0.20}
-AGE_LABEL = {"under1": "Under 1 year", "1to3": "1–3 years", "3to5": "3–5 years",
-             "5to8": "5–8 years", "8to12": "8–12 years", "12plus": "12+ years"}
-RANGE = 0.12  # +/- 12% around the estimate
+SAR_TO_AED = 3.6725 / 3.75      # both currencies are pegged to the USD
+DATA_YEAR = 2021                # year the listings were collected
+CURRENT_YEAR = date.today().year
+MIN_YEAR = 2000
+
+CATS = ["Make", "Type", "Gear_Type", "Options", "Fuel_Type"]
+NUMS = ["Age", "Mileage", "Engine_Size"]
+FEATURES = CATS + NUMS
+
+# ---------- Data ----------
+raw = pd.read_csv("UsedCarsSA_Clean_EN.csv").drop_duplicates()
+# Price 0 = "negotiable" listing with no price; the rest removes obvious junk rows.
+df = raw[
+    (raw.Price >= 5000)
+    & (raw.Year >= 1995)
+    & (raw.Mileage >= 1000)
+    & (raw.Mileage <= 500000)
+].copy()
+df["Age"] = (DATA_YEAR - df["Year"]).clip(lower=0)
 
 # ---------- Model ----------
-df = read_csv("car.data", header=None).values
-X = df[:, :-1]
-y = df[:, -1].astype(str)
-
-feature_names = [
-    "Buying price", "Maintenance cost", "Number of doors",
-    "Passenger capacity", "Luggage boot size", "Safety rating",
-]
-
-X_train, X_test, y_train, y_test = train_test_split(
-    X, y, test_size=0.33, random_state=1, stratify=y
-)
-
 encoder = OrdinalEncoder(handle_unknown="use_encoded_value", unknown_value=-1)
-X_train_encoded = encoder.fit_transform(X_train)
-X_test_encoded = encoder.transform(X_test)
+X = np.hstack([encoder.fit_transform(df[CATS]), df[NUMS].values])
+y = np.log(df["Price"].values)
 
-label_encoder = LabelEncoder()
-y_train_encoded = label_encoder.fit_transform(y_train)
-y_test_encoded = label_encoder.transform(y_test)
-
-model = DecisionTreeClassifier(random_state=1)
-model.fit(X_train_encoded, y_train_encoded)
-
-accuracy = round(accuracy_score(y_test_encoded, model.predict(X_test_encoded)) * 100, 2)
-
-feature_importance = [
-    {"name": name, "value": round(float(value) * 100, 1)}
-    for name, value in zip(feature_names, model.feature_importances_)
-]
-feature_importance.sort(key=lambda item: item["value"], reverse=True)
-
-RESULT_TEXT = {
-    "UNACC": "Unacceptable: it fails at least one fundamental requirement.",
-    "ACC": "Acceptable: it does the job, but has weaknesses holding it back.",
-    "GOOD": "Good: a well-balanced car with few weak points.",
-    "VGOOD": "Very good: strong on cost, practicality and safety.",
-}
+# Older age and higher mileage can only push the price down.
+MONOTONIC = [0, 0, 0, 0, 0, -1, -1, 0]
 
 
-def predict_car(values):
-    encoded_values = encoder.transform([values])
-    prediction = model.predict(encoded_values)[0]
-    return label_encoder.inverse_transform([prediction])[0].upper()
+def new_model():
+    return HistGradientBoostingRegressor(
+        max_iter=300, learning_rate=0.07, monotonic_cst=MONOTONIC, random_state=1
+    )
 
 
-def explain(values, result):
-    """Plain-English reasons, based on the rules in the car dataset."""
-    b, m, d, p, l, s = values
-    reasons = []
+# Honest accuracy: predict every car using a model that never saw it.
+cv_pred = cross_val_predict(new_model(), X, y, cv=KFold(5, shuffle=True, random_state=1))
+cv_err = np.abs(np.exp(cv_pred) - df["Price"].values) / df["Price"].values
+MEDIAN_ERROR = round(float(np.median(cv_err)) * 100)
+WITHIN_25 = round(float((cv_err <= 0.25).mean()) * 100)
+resid = y - cv_pred
+LOW_MULT = float(np.exp(np.quantile(resid, 0.10)))
+HIGH_MULT = float(np.exp(np.quantile(resid, 0.90)))
 
-    # Deal-breakers
-    if s == "low":
-        reasons.append(("bad", "Low safety rating",
-                        "This is a deal-breaker. In the dataset, every car with a low safety rating is unacceptable, whatever else it offers."))
-    elif s == "high":
-        reasons.append(("good", "High safety rating", "Top safety is the biggest single boost to a car's rating."))
-    else:
-        reasons.append(("warn", "Medium safety rating", "Okay, but a high rating is needed to reach the 'good' and 'very good' tiers."))
+model = new_model().fit(X, y)
 
-    if p == "2":
-        reasons.append(("bad", "Only 2 passengers",
-                        "This is also a deal-breaker: 2-seaters are rated unacceptable in this evaluation, however good they are otherwise."))
-    elif p == "more":
-        reasons.append(("good", "Seats more than 4", "High passenger capacity improves practicality."))
-    else:
-        reasons.append(("good", "Seats 4", "A practical, standard capacity."))
-
-    # Cost
-    if (b, m) in {("vhigh", "vhigh"), ("vhigh", "high"), ("high", "vhigh")}:
-        reasons.append(("bad", "Buying + running cost is too high",
-                        "A very high purchase price combined with high maintenance (or the reverse) makes the car unacceptable on cost alone."))
-    else:
-        if b in ("vhigh", "high"):
-            reasons.append(("warn", "Expensive to buy", "A high purchase price caps how well the car can rate overall."))
-        elif b == "low":
-            reasons.append(("good", "Low purchase price", "Cheap to buy, which helps the rating."))
-        if m in ("vhigh", "high"):
-            reasons.append(("warn", "Costly to maintain", "High upkeep costs hold back the rating, even on a good car."))
-        elif m == "low":
-            reasons.append(("good", "Low maintenance cost", "Cheap to run, a strong plus for the rating."))
-
-    # Boot
-    if l == "small":
-        reasons.append(("warn", "Small boot", "A small luggage space can keep an otherwise good car from reaching the top tier."))
-    elif l == "big":
-        reasons.append(("good", "Large boot", "More luggage space improves practicality."))
-
-    # Doors
-    reasons.append(("neutral", f"{d.replace('5more', '5+')} doors", "Door count has very little effect on the rating."))
-
-    return {"summary": RESULT_TEXT.get(result, ""), "items": reasons}
+# ---------- Form options ----------
+make_counts = df["Make"].value_counts()
+MAKES = {}
+for make in sorted(make_counts[make_counts >= 10].index):
+    t = df[df.Make == make]["Type"].value_counts()
+    MAKES[make] = sorted(t[t >= 3].index)
+TYPE_ENGINE = df.groupby(["Make", "Type"])["Engine_Size"].median().round(1)
+ENGINE_DEFAULTS = {m: {t: float(TYPE_ENGINE.get((m, t), 2.5)) for t in ts} for m, ts in MAKES.items()}
+OPTIONS = ["Standard", "Semi Full", "Full"]
+FUELS = ["Gas", "Diesel", "Hybrid"]
+GEARS = ["Automatic", "Manual"]
 
 
-def estimate_value(values, result, age):
-    b, m, d, p, l, s = values
-    base = BASE_PRICE[b]
+# ---------- Helpers ----------
+def aed(v):
+    return f"{CURRENCY} {round(v / 500) * 500:,.0f}"
+
+
+def signed(v):
+    return ("+" if v >= 0 else "-") + f"{CURRENCY} {abs(round(v / 500) * 500):,.0f}"
+
+
+def predict(f):
+    row = pd.DataFrame([[f[c] for c in FEATURES]], columns=FEATURES)
+    x = np.hstack([encoder.transform(row[CATS]), row[NUMS].values.astype(float)])
+    return float(np.exp(model.predict(x)[0])) * SAR_TO_AED
+
+
+def typical_mileage(age):
+    for w in range(1, 6):
+        sub = df[(df.Age - age).abs() <= w]
+        if len(sub) >= 15:
+            return float(sub["Mileage"].median())
+    return 18000.0 * max(age, 1)
+
+
+def explain(f):
+    items = []
+    final = predict(f)
+
+    # Age and mileage: a step-by-step walk from "nearly new" to this car (sums exactly).
+    new_f = dict(f, Age=0, Mileage=typical_mileage(0))
+    aged_f = dict(f, Mileage=typical_mileage(f["Age"]))
+    p_new, p_aged = predict(new_f), predict(aged_f)
+    typ = typical_mileage(f["Age"])
     steps = [
-        ("Car age (" + AGE_LABEL[age] + ")", AGE_FACTOR[age]),
-        ("Overall condition rating (" + result.title() + ")", CLASS_FACTOR[result.lower()]),
-        ("Maintenance cost (" + m + ")", MAINT_FACTOR[m]),
-        ("Safety rating (" + s + ")", SAFETY_FACTOR[s]),
-        ("Passenger capacity (" + p + ")", PERSONS_FACTOR[p]),
-        ("Boot size (" + l + ")", BOOT_FACTOR[l]),
+        {"label": "Same car, nearly new", "amount": aed(p_new), "delta": None, "good": True},
+        {"label": f"Age ({f['Age']} years old)", "amount": None, "delta": signed(p_aged - p_new),
+         "good": p_aged >= p_new},
+        {"label": f"Mileage ({f['Mileage']:,.0f} km vs ~{round(typ, -3):,.0f} km typical)",
+         "amount": None, "delta": signed(final - p_aged), "good": final >= p_aged},
     ]
-    total = base
-    for _, factor in steps:
-        total *= factor
 
-    def money(v):
-        return f"{CURRENCY} {round(v / 500) * 500:,.0f}"
+    # Other factors, each compared with a baseline on its own.
+    other = []
+    if f["Options"] != "Standard":
+        d = final - predict(dict(f, Options="Standard"))
+        other.append((d >= 0, f"{f['Options']} options", f"{signed(d)} compared with a Standard-spec version"))
+    else:
+        d = final - predict(dict(f, Options="Full"))
+        other.append((d >= 0, "Standard options", f"{signed(d)} compared with a Full-spec version"))
+    if f["Gear_Type"] == "Manual":
+        d = final - predict(dict(f, Gear_Type="Automatic"))
+        other.append((d >= 0, "Manual gearbox", f"{signed(d)} compared with an automatic"))
+    eng_typ = ENGINE_DEFAULTS.get(f["Make"], {}).get(f["Type"])
+    if eng_typ and abs(f["Engine_Size"] - eng_typ) >= 0.3:
+        d = final - predict(dict(f, Engine_Size=eng_typ))
+        other.append((d >= 0, f"{f['Engine_Size']}L engine",
+                      f"{signed(d)} compared with the usual {eng_typ}L for this model"))
+    if f["Fuel_Type"] != "Gas":
+        d = final - predict(dict(f, Fuel_Type="Gas"))
+        other.append((d >= 0, f"{f['Fuel_Type']} engine", f"{signed(d)} compared with a petrol version"))
 
-    return {
-        "mid": money(total),
-        "low": money(total * (1 - RANGE)),
-        "high": money(total * (1 + RANGE)),
-        "base": money(base),
-        "steps": [
-            {"label": label, "pct": f"{(f - 1) * 100:+.0f}%", "good": f >= 1}
-            for label, f in steps
-        ],
-    }
+    # Comparable listings in the data
+    comp = df[(df.Make == f["Make"]) & (df.Type == f["Type"]) & ((df.Age - f["Age"]).abs() <= 2)]
+    comparable = None
+    if len(comp) >= 5:
+        comparable = {"n": len(comp), "median": aed(float(comp["Price"].median()) * SAR_TO_AED)}
+
+    return steps, other, comparable
 
 
 @app.route("/", methods=["GET", "POST"])
 def index():
-    result = None
-    error = None
-    submitted_values = None
-    upgrade_path = []
-    reasons = None
-    value = None
-
+    out, error, form = None, None, {}
     if request.method == "POST":
-        submitted_values = [
-            request.form.get("b", ""), request.form.get("m", ""),
-            request.form.get("d", ""), request.form.get("p", ""),
-            request.form.get("l", ""), request.form.get("s", ""),
-        ]
-        age = request.form.get("a", "")
-
-        if all(submitted_values) and age in AGE_FACTOR:
-            try:
-                result = predict_car(submitted_values)
-                reasons = explain(submitted_values, result)
-                value = estimate_value(submitted_values, result, age)
-
-                upgrade_options = {
-                    0: ["low", "med", "high", "vhigh"],
-                    1: ["low", "med", "high", "vhigh"],
-                    2: ["2", "3", "4", "5more"],
-                    3: ["2", "4", "more"],
-                    4: ["small", "med", "big"],
-                    5: ["low", "med", "high"],
-                }
-
-                for idx, options in upgrade_options.items():
-                    current_position = options.index(submitted_values[idx])
-                    if current_position < len(options) - 1:
-                        changed_values = submitted_values.copy()
-                        changed_values[idx] = options[current_position + 1]
-                        changed_result = predict_car(changed_values)
-
-                        if changed_result != result:
-                            upgrade_path.append({
-                                "feature": feature_names[idx],
-                                "from_value": submitted_values[idx],
-                                "to_value": options[current_position + 1],
-                                "new_result": changed_result,
-                            })
-
-                upgrade_path.sort(
-                    key=lambda item: next(
-                        f["value"] for f in feature_importance if f["name"] == item["feature"]
-                    ),
-                    reverse=True,
-                )
-            except Exception:
-                error = "Please complete every vehicle detail before evaluating."
-        else:
-            error = "Please complete every vehicle detail before evaluating."
-
+        form = request.form.to_dict()
+        try:
+            make, typ = form["make"], form["type"]
+            year, mileage, engine = int(form["year"]), int(form["mileage"]), float(form["engine"])
+            gear, options, fuel = form["gear"], form["options"], form["fuel"]
+            if make not in MAKES or typ not in MAKES[make]:
+                raise ValueError
+            if not (MIN_YEAR <= year <= CURRENT_YEAR) or not (0 <= mileage <= 600000) or not (1.0 <= engine <= 9.0):
+                raise ValueError
+            if gear not in GEARS or options not in OPTIONS or fuel not in FUELS:
+                raise ValueError
+            age = min(max(CURRENT_YEAR - year, 0), 26)
+            f = {"Make": make, "Type": typ, "Gear_Type": gear, "Options": options, "Fuel_Type": fuel,
+                 "Age": age, "Mileage": mileage, "Engine_Size": engine}
+            mid = predict(f)
+            steps, other, comparable = explain(f)
+            out = {
+                "mid": aed(mid), "low": aed(mid * LOW_MULT), "high": aed(mid * HIGH_MULT),
+                "steps": steps, "other": other, "comparable": comparable,
+                "title": f"{year} {make} {typ}",
+            }
+        except Exception:
+            error = "Please check the car details: pick a make and model, and enter a realistic year, mileage and engine size."
     return render_template(
-        "index.html",
-        result=result, res=result, error=error,
-        accuracy=accuracy, acc=accuracy,
-        feature_importance=feature_importance,
-        upgrade_path=upgrade_path,
-        submitted_values=submitted_values,
-        reasons=reasons, value=value,
+        "index.html", out=out, error=error, form=form, makes=MAKES, engines=ENGINE_DEFAULTS,
+        options=OPTIONS, fuels=FUELS, gears=GEARS, min_year=MIN_YEAR, max_year=CURRENT_YEAR,
+        n_cars=len(df), median_error=MEDIAN_ERROR, within_25=WITHIN_25, data_year=DATA_YEAR,
+        currency=CURRENCY,
     )
 
 
