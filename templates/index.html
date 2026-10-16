@@ -6,16 +6,7 @@
   <title>Torquex — Current Car Evaluation</title>
   <style>
     * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      min-height: 100vh;
-      font-family: Inter, Arial, sans-serif;
-      color: #f5f7fb;
-      background: #07101f;
-      display: flex;
-      justify-content: center;
-      padding: 32px 16px;
-    }
+    body { margin: 0; min-height: 100vh; font-family: Inter, Arial, sans-serif; color: #f5f7fb; background: #07101f; display: flex; justify-content: center; padding: 32px 16px; }
     .orb { position: fixed; width: 360px; height: 360px; border-radius: 50%; filter: blur(90px); opacity: .22; pointer-events: none; }
     .orb.one { background: #1687ff; top: -130px; left: -100px; }
     .orb.two { background: #8b5cf6; right: -130px; bottom: -140px; }
@@ -48,7 +39,8 @@
   </style>
 </head>
 <body>
-  <div class="orb one"></div><div class="orb two"></div>
+  <div class="orb one"></div>
+  <div class="orb two"></div>
   <main class="shell">
     <header>
       <div class="brand"><div class="logo"></div><span>TORQUE<span style="color:#59b9ff">X</span></span></div>
@@ -62,22 +54,22 @@
         <p class="intro">Enter the details of your current car to receive an evaluation based on its buying price, condition, practicality, and safety profile.</p>
         <form method="POST">
           <label>Buying price
-            <select name="b"><option>v-high</option><option>high</option><option selected>med</option><option>low</option></select>
+            <select name="b" required><option>v-high</option><option>high</option><option selected>med</option><option>low</option></select>
           </label>
           <label>Maintenance cost
-            <select name="m"><option>v-high</option><option>high</option><option selected>med</option><option>low</option></select>
+            <select name="m" required><option>v-high</option><option>high</option><option selected>med</option><option>low</option></select>
           </label>
           <label>Number of doors
-            <select name="d"><option>2</option><option>3</option><option selected>4</option><option>5-more</option></select>
+            <select name="d" required><option>2</option><option>3</option><option selected>4</option><option>5-more</option></select>
           </label>
           <label>Passenger capacity
-            <select name="p"><option>2</option><option selected>4</option><option>more</option></select>
+            <select name="p" required><option>2</option><option selected>4</option><option>more</option></select>
           </label>
           <label>Luggage boot size
-            <select name="l"><option>small</option><option selected>med</option><option>big</option></select>
+            <select name="l" required><option>small</option><option selected>med</option><option>big</option></select>
           </label>
           <label>Safety rating
-            <select name="s"><option>low</option><option selected>med</option><option>high</option></select>
+            <select name="s" required><option>low</option><option selected>med</option><option>high</option></select>
           </label>
           <button type="submit">Evaluate my current car</button>
         </form>
@@ -93,9 +85,9 @@
         <div>
           <p class="section-title">Torquex evaluation</p>
           <h2>A clearer view of your current vehicle.</h2>
-          <p>This keeps your existing machine-learning model and evaluates the information you submit about the car you already own.</p>
+          <p>This evaluates the information you submit about the car you already own while keeping your existing machine-learning model.</p>
         </div>
-        <p class="note">Your existing Flask route, prediction fields, and model remain unchanged. Model accuracy: {{ acc }}%</p>
+        <p class="note">Your existing Flask route, prediction fields, and model remain unchanged.</p>
       </aside>
     </div>
   </main>
