@@ -3,70 +3,68 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>TorqueX | Current Car Evaluation</title>
+  <title>TorqueX | Car Value Estimator</title>
   <style>
     :root{--bg:#07101f;--panel:#111f34e8;--panel2:#0b172a;--border:#29415f;--text:#f4f7fb;--muted:#9aacc5;--blue:#2d8cff;--purple:#7045ef;--green:#4ade80;--red:#fb7185}
     *{box-sizing:border-box}body{margin:0;min-height:100vh;color:var(--text);font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif;background:radial-gradient(circle at 5% 8%,#1b68be59,transparent 30%),radial-gradient(circle at 100% 88%,#683ee14a,transparent 32%),var(--bg);overflow-x:hidden}
     body:before{content:"";position:fixed;inset:0;pointer-events:none;opacity:.16;background-image:linear-gradient(#fff1 1px,transparent 1px),linear-gradient(90deg,#fff1 1px,transparent 1px);background-size:42px 42px;mask-image:linear-gradient(to bottom,#000,transparent 80%)}
     .shell{width:min(1180px,calc(100% - 32px));margin:auto;padding:24px 0 60px}header{display:flex;align-items:center;justify-content:space-between;margin-bottom:32px;animation:down .7s ease both}.brand{display:flex;align-items:center;gap:14px}.logo{display:grid;place-items:center;width:56px;height:56px;border-radius:17px;font-size:30px;font-weight:900;background:linear-gradient(135deg,var(--blue),var(--purple));box-shadow:0 12px 34px #3e59ff57}.brand-name{font-size:24px;font-weight:900;letter-spacing:1px}.brand-name span{color:#55b8ff}.status{border:1px solid var(--border);border-radius:999px;padding:10px 16px;color:var(--muted);font-size:12px;letter-spacing:.7px;text-transform:uppercase}
-    .grid{display:grid;grid-template-columns:1.05fr .95fr;gap:22px}.card{border:1px solid var(--border);border-radius:26px;background:var(--panel);box-shadow:0 24px 70px #0004;backdrop-filter:blur(16px);padding:34px;animation:up .7s ease both}.eyebrow{margin:0 0 22px;color:#91a5c0;font-size:14px;letter-spacing:1.5px;text-transform:uppercase}.title{margin:0;font-size:clamp(38px,5vw,66px);line-height:.98;letter-spacing:-3px}.intro{margin:24px 0 28px;color:var(--muted);font-size:17px;line-height:1.65}.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}label{display:grid;gap:8px;color:#cbd6e6;font-weight:700;font-size:14px}select{width:100%;appearance:none;border:1px solid #385273;border-radius:14px;padding:15px 42px 15px 16px;color:var(--text);font:inherit;font-weight:700;background:#08162a url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' fill='none' stroke='%239aacc5' stroke-width='2'%3E%3Cpath d='m4 7 5 5 5-5'/%3E%3C/svg%3E") no-repeat right 15px center;transition:.2s}select:hover,select:focus{border-color:var(--blue);box-shadow:0 0 0 4px #2d8cff1f;outline:none}.submit{width:100%;margin-top:24px;border:0;border-radius:14px;padding:17px;color:white;font:inherit;font-weight:900;font-size:17px;cursor:pointer;background:linear-gradient(100deg,var(--blue),var(--purple));box-shadow:0 12px 25px #4d5aff47;transition:.2s}.submit:hover{transform:translateY(-3px);box-shadow:0 18px 30px #4d5aff66}.result-card{min-height:100%;display:flex;flex-direction:column}.result-title{margin:0;color:#f4f7fb;font-size:32px;line-height:1.1}.result-copy{color:var(--muted);font-size:17px;line-height:1.55}.empty{display:grid;place-items:center;flex:1;min-height:300px;border:1px dashed #385273;border-radius:18px;color:#7890ad;text-align:center}.result{margin:26px 0 0;padding:22px;border-radius:18px;background:linear-gradient(135deg,#16365a,#21174d);text-align:center;animation:reveal .5s ease both}.result strong{display:block;margin-top:6px;font-size:42px;letter-spacing:1px;color:#fff}.analysis{grid-column:1/-1;padding:28px}.analysis h2{margin:0 0 22px;font-size:25px}.importance{display:grid;gap:15px}.row{display:grid;gap:7px}.row-head{display:flex;justify-content:space-between;color:#cbd6e6}.track{height:9px;border-radius:99px;overflow:hidden;background:#1b2c47}.bar{height:100%;border-radius:inherit;background:linear-gradient(90deg,var(--blue),var(--purple));transform-origin:left;animation:grow .9s ease both}.upgrades{display:grid;gap:12px;margin-top:24px}.upgrade{padding:16px;border:1px solid #29415f;border-radius:14px;background:var(--panel2);color:var(--muted)}.upgrade strong,.upgrade b{color:white}.error{margin-top:18px;padding:14px;border:1px solid #ef444466;border-radius:12px;color:#fecdd3;background:#7f1d1d55}
-    .reasons{display:grid;gap:12px;margin-bottom:6px}
-    .reason{display:grid;gap:4px;padding:14px 16px;border-radius:14px;background:var(--panel2);border:1px solid #29415f;border-left-width:4px;color:var(--muted);font-size:15px;line-height:1.5}
-    .reason b{color:#fff}
-    .reason.good{border-left-color:var(--green)}
-    .reason.bad{border-left-color:var(--red)}
-    .reason.warn{border-left-color:#fbbf24}
-    .reason.neutral{border-left-color:#64748b}
-    @keyframes down{from{opacity:0;transform:translateY(-15px)}to{opacity:1;transform:none}}@keyframes up{from{opacity:0;transform:translateY(22px)}to{opacity:1;transform:none}}@keyframes reveal{from{opacity:0;transform:scale(.97)}to{opacity:1;transform:none}}@keyframes grow{from{transform:scaleX(0)}to{transform:scaleX(1)}}
-    @media(max-width:800px){.grid{grid-template-columns:1fr}.analysis{grid-column:auto}.card{padding:24px}.status{display:none}}@media(max-width:500px){.shell{width:min(100% - 22px,600px)}.form-grid{grid-template-columns:1fr}.title{letter-spacing:-2px}.brand-name{font-size:20px}}
+    .grid{display:grid;grid-template-columns:1.05fr .95fr;gap:22px}.card{border:1px solid var(--border);border-radius:26px;background:var(--panel);box-shadow:0 24px 70px #0004;backdrop-filter:blur(16px);padding:34px;animation:up .7s ease both}.eyebrow{margin:0 0 22px;color:#91a5c0;font-size:14px;letter-spacing:1.5px;text-transform:uppercase}.title{margin:0;font-size:clamp(38px,5vw,66px);line-height:.98;letter-spacing:-3px}.intro{margin:24px 0 28px;color:var(--muted);font-size:17px;line-height:1.65}.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}label{display:grid;gap:8px;color:#cbd6e6;font-weight:700;font-size:14px}
+    select,input{width:100%;border:1px solid #385273;border-radius:14px;padding:15px 16px;color:var(--text);font:inherit;font-weight:700;background:#08162a;transition:.2s}select{appearance:none;padding-right:42px;background:#08162a url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' fill='none' stroke='%239aacc5' stroke-width='2'%3E%3Cpath d='m4 7 5 5 5-5'/%3E%3C/svg%3E") no-repeat right 15px center}select:hover,select:focus,input:hover,input:focus{border-color:var(--blue);box-shadow:0 0 0 4px #2d8cff1f;outline:none}
+    .submit{width:100%;margin-top:24px;border:0;border-radius:14px;padding:17px;color:white;font:inherit;font-weight:900;font-size:17px;cursor:pointer;background:linear-gradient(100deg,var(--blue),var(--purple));box-shadow:0 12px 25px #4d5aff47;transition:.2s}.submit:hover{transform:translateY(-3px);box-shadow:0 18px 30px #4d5aff66}.result-card{min-height:100%;display:flex;flex-direction:column}.result-title{margin:0;color:#f4f7fb;font-size:32px;line-height:1.1}.result-copy{color:var(--muted);font-size:17px;line-height:1.55}.empty{display:grid;place-items:center;flex:1;min-height:300px;border:1px dashed #385273;border-radius:18px;color:#7890ad;text-align:center}.result{margin:26px 0 0;padding:22px;border-radius:18px;background:linear-gradient(135deg,#16365a,#21174d);text-align:center;animation:reveal .5s ease both}.result strong{display:block;margin-top:6px;font-size:42px;letter-spacing:1px;color:#fff}.result .range{font-size:14px;color:#9aacc5}
+    .analysis{grid-column:1/-1;padding:28px}.analysis h2{margin:0 0 18px;font-size:25px}.cols{display:grid;grid-template-columns:1fr 1fr;gap:28px}.stack{display:grid;gap:12px}.upgrade{display:flex;justify-content:space-between;gap:12px;padding:16px;border:1px solid #29415f;border-radius:14px;background:var(--panel2);color:var(--muted)}.upgrade b{color:white}.upgrade b.g{color:var(--green)}.upgrade b.r{color:var(--red)}
+    .reason{display:grid;gap:4px;padding:14px 16px;border-radius:14px;background:var(--panel2);border:1px solid #29415f;border-left-width:4px;color:var(--muted);font-size:15px;line-height:1.5}.reason b{color:#fff}.reason.good{border-left-color:var(--green)}.reason.bad{border-left-color:var(--red)}
+    .note{color:var(--muted);font-size:13px;line-height:1.6;margin:14px 0 0}.error{margin-top:18px;padding:14px;border:1px solid #ef444466;border-radius:12px;color:#fecdd3;background:#7f1d1d55}
+    @keyframes down{from{opacity:0;transform:translateY(-15px)}to{opacity:1;transform:none}}@keyframes up{from{opacity:0;transform:translateY(22px)}to{opacity:1;transform:none}}@keyframes reveal{from{opacity:0;transform:scale(.97)}to{opacity:1;transform:none}}
+    @media(max-width:800px){.grid,.cols{grid-template-columns:1fr}.analysis{grid-column:auto}.card{padding:24px}.status{display:none}}@media(max-width:500px){.shell{width:min(100% - 22px,600px)}.form-grid{grid-template-columns:1fr}.title{letter-spacing:-2px}.brand-name{font-size:20px}}
   </style>
 </head>
 <body>
   <main class="shell">
-    <header><div class="brand"><div class="logo">T</div><div class="brand-name">TORQUE<span>X</span></div></div><div class="status">Current car evaluation</div></header>
+    <header><div class="brand"><div class="logo">T</div><div class="brand-name">TORQUE<span>X</span></div></div><div class="status">Car value estimator</div></header>
     <section class="grid">
       <form class="card" method="post" action="{{ url_for('index') }}">
-        <p class="eyebrow">Vehicle profile</p><h1 class="title">Understand what your car is worth.</h1><p class="intro">Enter details about the car you already own to receive a clear evaluation based on its condition, practicality and safety profile.</p>
+        <p class="eyebrow">Vehicle profile</p><h1 class="title">Understand what your car is worth.</h1><p class="intro">Enter the details of the car you own to get an estimated value, and see exactly what pushes the price up or down.</p>
         <div class="form-grid">
-          <label>Buying price<select name="b" required><option value="">Choose a price</option><option value="low">Low</option><option value="med">Medium</option><option value="high">High</option><option value="vhigh">Very high</option></select></label>
-          <label>Maintenance cost<select name="m" required><option value="">Choose a cost</option><option value="low">Low</option><option value="med">Medium</option><option value="high">High</option><option value="vhigh">Very high</option></select></label>
-          <label>Number of doors<select name="d" required><option value="">Choose doors</option><option value="2">2 doors</option><option value="3">3 doors</option><option value="4">4 doors</option><option value="5more">5 or more doors</option></select></label>
-          <label>Passenger capacity<select name="p" required><option value="">Choose capacity</option><option value="2">2 passengers</option><option value="4">4 passengers</option><option value="more">More than 4 passengers</option></select></label>
-          <label>Luggage boot size<select name="l" required><option value="">Choose boot size</option><option value="small">Small</option><option value="med">Medium</option><option value="big">Large</option></select></label>
-          <label>Safety rating<select name="s" required><option value="">Choose safety</option><option value="low">Low</option><option value="med">Medium</option><option value="high">High</option></select></label>
-          <label>Car age<select name="a" required><option value="">Choose age</option><option value="under1">Under 1 year</option><option value="1to3">1–3 years</option><option value="3to5">3–5 years</option><option value="5to8">5–8 years</option><option value="8to12">8–12 years</option><option value="12plus">12+ years</option></select></label>
+          <label>Make<select name="make" id="make" required></select></label>
+          <label>Model<select name="type" id="type" required></select></label>
+          <label>Year<input type="number" name="year" min="{{ min_year }}" max="{{ max_year }}" placeholder="e.g. 2019" value="{{ form.get('year','') }}" required></label>
+          <label>Mileage (km)<input type="number" name="mileage" min="0" max="600000" placeholder="e.g. 85000" value="{{ form.get('mileage','') }}" required></label>
+          <label>Engine size (L)<input type="number" name="engine" id="engine" step="0.1" min="1" max="9" value="{{ form.get('engine','') }}" required></label>
+          <label>Gearbox<select name="gear">{% for g in gears %}<option {{ 'selected' if form.get('gear')==g }}>{{ g }}</option>{% endfor %}</select></label>
+          <label>Options<select name="options">{% for o in options %}<option {{ 'selected' if form.get('options')==o }}>{{ o }}</option>{% endfor %}</select></label>
+          <label>Fuel<select name="fuel">{% for f in fuels %}<option {{ 'selected' if form.get('fuel')==f }}>{{ f }}</option>{% endfor %}</select></label>
         </div>
-        <button class="submit" type="submit">Evaluate my current car</button>
+        <button class="submit" type="submit">Estimate my car's value</button>
         {% if error %}<div class="error" role="alert">{{ error }}</div>{% endif %}
       </form>
-      <section class="card result-card"><p class="eyebrow">TorqueX evaluation</p><h2 class="result-title">A clearer view of your current vehicle.</h2><p class="result-copy">Your evaluation appears here after you submit the details above.</p>{% if result %}<div class="result"><span>Overall evaluation</span><strong>{{ result }}</strong>{% if value %}<span style="display:block;margin-top:14px">Estimated current value</span><strong style="font-size:34px">{{ value.mid }}</strong><span style="font-size:13px;color:#9aacc5">Range: {{ value.low }} – {{ value.high }}</span>{% endif %}</div>{% else %}<div class="empty"><div><strong>Your result will appear here</strong><br><span>Complete the vehicle profile to begin.</span></div></div>{% endif %}</section>
-      {% if result %}<section class="card analysis">
-        {% if reasons %}
-        <h2>Why it's rated {{ result }}</h2>
-        <p class="result-copy" style="margin-top:-8px">{{ reasons.summary }}</p>
-        <div class="reasons">
-          {% for r in reasons['items'] %}
-          <div class="reason {{ r[0] }}"><b>{{ r[1] }}</b><span>{{ r[2] }}</span></div>
-          {% endfor %}
+      <section class="card result-card"><p class="eyebrow">TorqueX estimate</p><h2 class="result-title">A clearer view of your current vehicle.</h2><p class="result-copy">Your estimate appears here after you submit the details.</p>
+        {% if out %}<div class="result"><span>Estimated value of your {{ out.title }}</span><strong>{{ out.mid }}</strong><span class="range">Likely range: {{ out.low }} to {{ out.high }}</span></div>
+        {% if out.comparable %}<p class="note">{{ out.comparable.n }} similar {{ form.make }} {{ form.type }} listings in the data had a median price of {{ out.comparable.median }}.</p>{% endif %}
+        {% else %}<div class="empty"><div><strong>Your result will appear here</strong><br><span>Complete the vehicle profile to begin.</span></div></div>{% endif %}
+      </section>
+      {% if out %}<section class="card analysis">
+        <div class="cols">
+          <div><h2>How age and mileage change the price</h2><div class="stack">
+            {% for s in out.steps %}<div class="upgrade"><span>{{ s.label }}</span>{% if s.delta is none %}<b>{{ s.amount }}</b>{% else %}<b class="{{ 'g' if s.good else 'r' }}">{{ s.delta }}</b>{% endif %}</div>{% endfor %}
+            <div class="upgrade"><span><b>Your car's estimate</b></span><b>{{ out.mid }}</b></div>
+          </div></div>
+          <div><h2>Other factors</h2><div class="stack">
+            {% for good, title, text in out.other %}<div class="reason {{ 'good' if good else 'bad' }}"><b>{{ title }}</b><span>{{ text }}</span></div>{% endfor %}
+          </div><p class="note">Each factor is compared on its own against a baseline, so these don't add up to the total.</p></div>
         </div>
-        {% endif %}
-
-        {% if value %}
-        <h2 style="margin-top:34px">How the value was estimated</h2>
-        <div class="upgrades" style="margin-top:0">
-          <div class="upgrade">Starting point for this price tier: <b>{{ value.base }}</b></div>
-          {% for s in value.steps %}
-          <div class="upgrade" style="display:flex;justify-content:space-between"><span>{{ s.label }}</span><b style="color:{{ '#4ade80' if s.good else '#fb7185' }}">{{ s.pct }}</b></div>
-          {% endfor %}
-          <div class="upgrade" style="font-size:13px">This is a rough estimate from the details above. Mileage, brand, model, trim and local market conditions change real prices a lot.</div>
-        </div>
-        {% endif %}
-
-        <h2 style="margin-top:34px">Feature importance</h2>
-        <div class="importance">{% for feature in feature_importance %}<div class="row"><div class="row-head"><span>{{ feature.name }}</span><strong>{{ feature.value }}%</strong></div><div class="track"><div class="bar" style="width:{{ feature.value }}%"></div></div></div>{% endfor %}</div>
-        <div class="upgrades"><h2>Upgrade Path</h2>{% if upgrade_path %}{% for upgrade in upgrade_path[:3] %}<div class="upgrade"><strong>{{ upgrade.feature }}</strong><br>Increase from <b>{{ upgrade.from_value }}</b> to <b>{{ upgrade.to_value }}</b> to potentially reach <b>{{ upgrade.new_result }}</b>.</div>{% endfor %}{% else %}<div class="upgrade">No single-feature change altered the evaluation for this vehicle.</div>{% endif %}</div>
+        <p class="note" style="margin-top:26px">Based on {{ "{:,}".format(n_cars) }} real used-car listings (Saudi Arabia, {{ data_year }}) converted to {{ currency }}. On cars the model had never seen, the typical error was about {{ median_error }}% and {{ within_25 }}% of estimates landed within 25% of the asking price. These are asking prices, not sale prices, and UAE prices and newer models can differ, so treat this as a guide.</p>
       </section>{% endif %}
     </section>
   </main>
+  <script>
+    const MAKES={{ makes|tojson }},ENGINES={{ engines|tojson }},SAVED={make:{{ form.get('make','')|tojson }},type:{{ form.get('type','')|tojson }}};
+    const makeEl=document.getElementById('make'),typeEl=document.getElementById('type'),engEl=document.getElementById('engine');
+    function fillTypes(k){const t=MAKES[makeEl.value]||[];typeEl.innerHTML=t.map(x=>`<option>${x}</option>`).join('');if(k&&t.includes(k))typeEl.value=k}
+    function setEngine(f){const e=(ENGINES[makeEl.value]||{})[typeEl.value];if(e&&(f||!engEl.value))engEl.value=e}
+    makeEl.innerHTML=Object.keys(MAKES).map(m=>`<option>${m}</option>`).join('');
+    if(SAVED.make&&MAKES[SAVED.make])makeEl.value=SAVED.make;fillTypes(SAVED.type);setEngine(false);
+    makeEl.addEventListener('change',()=>{fillTypes();setEngine(true)});typeEl.addEventListener('change',()=>setEngine(true));
+  </script>
 </body>
 </html>
