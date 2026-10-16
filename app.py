@@ -70,6 +70,37 @@ FUELS = ["Gas", "Diesel", "Hybrid"]
 GEARS = ["Automatic", "Manual"]
 
 
+# ---------- Maintenance cost (rule-of-thumb, NOT learned from the dataset) ----------
+# The listings have no maintenance data, so this is a transparent estimate you can tune.
+TIER_BASE = {"Everyday": 2000, "Mid-range": 3000, "Premium": 4000, "Luxury": 7000}   # AED per year, young car
+MAKE_TIER = {m: "Everyday" for m in [
+    "Toyota", "Honda", "Hyundai", "Kia", "Nissan", "Mazda", "Mitsubishi", "Suzuki", "Isuzu",
+    "Changan", "Geely", "HAVAL", "MG", "Renault", "Peugeot", "Fiat"]}
+MAKE_TIER.update({m: "Mid-range" for m in [
+    "Chevrolet", "Ford", "GMC", "Dodge", "Chrysler", "Jeep", "Volkswagen", "MINI"]})
+MAKE_TIER.update({m: "Premium" for m in ["Lexus", "Genesis", "INFINITI", "Cadillac", "Lincoln"]})
+MAKE_TIER.update({m: "Luxury" for m in ["Mercedes", "BMW", "Audi", "Land Rover", "Jaguar", "Porsche"]})
+MAINT_RANGE = 0.30  # +/- 30%
+
+
+def aed100(v):
+    return f"{CURRENCY} {round(v / 100) * 100:,.0f}"
+
+
+def maintenance(f):
+    tier = MAKE_TIER.get(f["Make"], "Mid-range")
+    base = TIER_BASE[tier]
+    age_f = 1 + 0.07 * f["Age"]                     # older cars need more
+    km_f = 1 + 0.15 * (f["Mileage"] / 100000)       # high mileage wears parts
+    eng_f = 1 + 0.05 * (f["Engine_Size"] - 2.0)     # bigger engines cost more to service
+    year = base * min(age_f, 2.2) * km_f * max(eng_f, 0.9)
+    return {
+        "tier": tier,
+        "year": aed100(year), "year_low": aed100(year * (1 - MAINT_RANGE)), "year_high": aed100(year * (1 + MAINT_RANGE)),
+        "month": aed100(year / 12),
+    }
+
+
 # ---------- Helpers ----------
 def aed(v):
     return f"{CURRENCY} {round(v / 500) * 500:,.0f}"
@@ -161,7 +192,7 @@ def index():
             steps, other, comparable = explain(f)
             out = {
                 "mid": aed(mid), "low": aed(mid * LOW_MULT), "high": aed(mid * HIGH_MULT),
-                "steps": steps, "other": other, "comparable": comparable,
+                "steps": steps, "other": other, "maint": maintenance(f), "comparable": comparable,
                 "title": f"{year} {make} {typ}",
             }
         except Exception:
